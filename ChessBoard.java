@@ -1,3 +1,5 @@
+import edu.princeton.cs.algs4.StdDraw;
+import java.awt.Color;
 public class ChessBoard  {
     private ChessPiece[][] board;
 
@@ -34,19 +36,34 @@ public class ChessBoard  {
     }
 
     public void displayBoard() {
-        for (int i = 7; i  >= 0; i--) {
+        StdDraw.setCanvasSize(800, 800);
+        StdDraw.setXscale(0, 8);
+        StdDraw.setYscale(0, 8);
+        StdDraw.clear();
+
+        for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
-                if (board[i][j] != null) {
-                    String name = board[i][j].getName();
-                    if (name == "Knight") {
-                        name = "N"; // Use 'N' for Knight to avoid confusion with King
-                    }
-                    System.out.print(name.charAt(0) + "\t");
+                // Alternate colors for the board squares
+                if ((i + j) % 2 == 0) {
+                    StdDraw.setPenColor(new Color(240, 217, 181)); // Light color
                 } else {
-                    System.out.print(".\t"); // Empty square
+                    StdDraw.setPenColor(new Color(181, 136, 99)); // Dark color
+                }
+                StdDraw.filledSquare(j + 0.5, i + 0.5, 0.5);
+
+                // Draw pieces if present
+                if (board[i][j] != null) {
+                    ChessPiece piece = board[i][j];
+                    String symbol = piece.getName().substring(0, 1);
+                    if (piece.getName().equals("Knight")) symbol = "N";
+                    if (piece.getColor().equals("White")) {
+                        StdDraw.setPenColor(Color.WHITE);
+                    } else {
+                        StdDraw.setPenColor(Color.BLACK);
+                    }
+                    StdDraw.text(j + 0.5, i + 0.5, symbol);
                 }
             }
-            System.out.println();
         }
     }
 
