@@ -14,5 +14,13 @@ public class ChessMain {
         
         // Display the board after the move
         board.displayBoard();
+        while (true) {
+            System.out.println("Enter a piece: ");
+            String move = System.console().readLine();
+            if (move.equals("exit")) {
+                break;
+            }
+
+        }
     }
 }

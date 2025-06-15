@@ -1,38 +1,54 @@
 import edu.princeton.cs.algs4.StdDraw;
 import java.awt.Color;
-public class ChessBoard  {
-    private ChessPiece[][] board;
+
+public class ChessBoard {
+    private ChessPiece[] board;
 
     public ChessBoard() {
-        board = new ChessPiece[8][8];
+        board = new ChessPiece[64]; // 8x8 = 64 squares
     }
 
     public void initializePieces() {
-        // Initialize pawns
         for (int i = 0; i < 8; i++) {
-            board[1][i] = new ChessPiece("Pawn", "White");
-            board[6][i] = new ChessPiece("Pawn", "Black");
+            board[getIndex(1, i)] = new ChessPiece("Pawn", "White");
+            board[getIndex(6, i)] = new ChessPiece("Pawn", "Black");
         }
-        // Initialize rooks
-        board[0][0] = new ChessPiece("Rook", "White");
-        board[0][7] = new ChessPiece("Rook", "White");
-        board[7][0] = new ChessPiece("Rook", "Black");
-        board[7][7] = new ChessPiece("Rook", "Black");
-        // Initialize knights
-        board[0][1] = new ChessPiece("Knight", "White");
-        board[0][6] = new ChessPiece("Knight", "White");
-        board[7][1] = new ChessPiece("Knight", "Black");
-        board[7][6] = new ChessPiece("Knight", "Black");
-        // Initialize bishops
-        board[0][2] = new ChessPiece("Bishop", "White");
-        board[0][5] = new ChessPiece("Bishop", "White");
-        board[7][2] = new ChessPiece("Bishop", "Black");
-        board[7][5] = new ChessPiece("Bishop", "Black");
-        // Initialize queens and kings
-        board[0][3] = new ChessPiece("Queen", "White");
-        board[0][4] = new ChessPiece("King", "White");
-        board[7][3] = new ChessPiece("Queen", "Black");
-        board[7][4] = new ChessPiece("King", "Black");
+
+        // Rooks
+        board[getIndex(0, 0)] = new ChessPiece("Rook", "White");
+        board[getIndex(0, 7)] = new ChessPiece("Rook", "White");
+        board[getIndex(7, 0)] = new ChessPiece("Rook", "Black");
+        board[getIndex(7, 7)] = new ChessPiece("Rook", "Black");
+
+        // Knights
+        board[getIndex(0, 1)] = new ChessPiece("Knight", "White");
+        board[getIndex(0, 6)] = new ChessPiece("Knight", "White");
+        board[getIndex(7, 1)] = new ChessPiece("Knight", "Black");
+        board[getIndex(7, 6)] = new ChessPiece("Knight", "Black");
+
+        // Bishops
+        board[getIndex(0, 2)] = new ChessPiece("Bishop", "White");
+        board[getIndex(0, 5)] = new ChessPiece("Bishop", "White");
+        board[getIndex(7, 2)] = new ChessPiece("Bishop", "Black");
+        board[getIndex(7, 5)] = new ChessPiece("Bishop", "Black");
+
+        // Queens and Kings
+        board[getIndex(0, 3)] = new ChessPiece("Queen", "White");
+        board[getIndex(0, 4)] = new ChessPiece("King", "White");
+        board[getIndex(7, 3)] = new ChessPiece("Queen", "Black");
+        board[getIndex(7, 4)] = new ChessPiece("King", "Black");
+    }
+
+    private int getIndex(int row, int col) {
+        return row * 8 + col;
+    }
+
+    private int getRow(int index) {
+        return index / 8;
+    }
+
+    private int getCol(int index) {
+        return index % 8;
     }
 
     public void displayBoard() {
@@ -41,31 +57,36 @@ public class ChessBoard  {
         StdDraw.setYscale(0, 8);
         StdDraw.clear();
 
-        for (int i = 0; i < 8; i++) {
-            for (int j = 0; j < 8; j++) {
-                // Alternate colors for the board squares
-                if ((i + j) % 2 == 0) {
-                    StdDraw.setPenColor(new Color(240, 217, 181)); // Light color
-                } else {
-                    StdDraw.setPenColor(new Color(181, 136, 99)); // Dark color
-                }
-                StdDraw.filledSquare(j + 0.5, i + 0.5, 0.5);
+        for (int index = 0; index < 64; index++) {
+            int row = index / 8;
+            int col = index % 8;
 
-                // Draw pieces if present
-                if (board[i][j] != null) {
-                    ChessPiece piece = board[i][j];
-                    String symbol = piece.getName().substring(0, 1);
-                    if (piece.getName().equals("Knight")) symbol = "N";
-                    if (piece.getColor().equals("White")) {
-                        StdDraw.setPenColor(Color.WHITE);
-                    } else {
-                        StdDraw.setPenColor(Color.BLACK);
-                    }
-                    StdDraw.text(j + 0.5, i + 0.5, symbol);
-                }
+            if ((row + col) % 2 == 0) {
+                StdDraw.setPenColor(new Color(240, 217, 181));
+            } else {
+                StdDraw.setPenColor(new Color(181, 136, 99));
+            }
+            StdDraw.filledSquare(col + 0.5, row + 0.5, 0.5);
+
+            if (board[index] != null) {
+                ChessPiece piece = board[index];
+                String symbol = piece.getName().equals("Knight") ? "N" : piece.getName().substring(0, 1);
+                StdDraw.setPenColor(piece.getColor().equals("White") ? Color.WHITE : Color.BLACK);
+                StdDraw.text(col + 0.5, row + 0.5, symbol);
             }
         }
     }
 
-    //public void movePiece(String from
+    // Placeholder for move logic
+    public void movePiece(String command) {
+        // e.g., "Pe2-e4"
+    }
+
+    public boolean isWhiteInCheck() {
+        return false;
+    }
+
+    public boolean isBlackInCheck() {
+        return false;
+    }
 }
