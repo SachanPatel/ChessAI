@@ -1,20 +1,20 @@
 public class ChessPiece {
-    public String name;
-    public String color;
+    public char name;
+    public char color;
 
-    public ChessPiece(String name, String color) {
+    public ChessPiece(char name, char color) {
         this.name = name;
         this.color = color;
     }
 
-    public String getName() {
+    public char getName() {
         return name;
     }
 
-    public String getColor() {
+    public char getColor() {
         return color;
     }
     
-    
+
 
 }

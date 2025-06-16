@@ -9,17 +9,16 @@ public class ChessMain {
         // Display the initial state of the board
         board.displayBoard();
         
-        // Example move: Move a pawn from e2 to e4
-        //board.movePiece("e2", "e4");
         
-        // Display the board after the move
-        board.displayBoard();
+        
         while (true) {
-            System.out.println("Enter a piece: ");
+            System.out.println("Enter a command: ");
             String move = System.console().readLine();
             if (move.equals("exit")) {
                 break;
             }
+            board.movePiece(move);
+            board.displayBoard();
 
         }
     }
