@@ -302,16 +302,87 @@ public class ChessBoard {
             }
         } 
         else if (pieceType == 'N') {
-
+            if (Math.abs(fromRow - toRow) == 2 && Math.abs(fromCol - toCol) == 1 ||
+                Math.abs(fromRow - toRow) == 1 && Math.abs(fromCol - toCol) == 2) {
+                // Valid knight move
+                executeMove(fromRow, fromCol, toRow, toCol);
+            } else {
+                System.out.println("Invalid knight move.");
+            }
         }
         else if (pieceType == 'B') {
-
+            if (Math.abs(fromRow - toRow) == Math.abs(fromCol - toCol)) {
+                // Diagonal move
+                int rowStep = (toRow - fromRow) > 0 ? 1 : -1;
+                int colStep = (toCol - fromCol) > 0 ? 1 : -1;
+                int r = fromRow + rowStep;
+                int c = fromCol + colStep;
+                while (r != toRow && c != toCol) {
+                    if (board[getIndex(r, c)] != null) {
+                        System.out.println("Path is blocked by another piece.");
+                        return;
+                    }
+                    r += rowStep;
+                    c += colStep;
+                }
+                executeMove(fromRow, fromCol, toRow, toCol);
+            } else {
+                System.out.println("Invalid bishop move.");
+            }
         }
         else if (pieceType == 'Q') {
-
+            if (Math.abs(fromRow - toRow) == Math.abs(fromCol - toCol)) {
+                // Diagonal move
+                int rowStep = (toRow - fromRow) > 0 ? 1 : -1;
+                int colStep = (toCol - fromCol) > 0 ? 1 : -1;
+                int r = fromRow + rowStep;
+                int c = fromCol + colStep;
+                while (r != toRow && c != toCol) {
+                    if (board[getIndex(r, c)] != null) {
+                        System.out.println("Path is blocked by another piece.");
+                        return;
+                    }
+                    r += rowStep;
+                    c += colStep;
+                }
+                executeMove(fromRow, fromCol, toRow, toCol);
+            } else if (fromIndex % 8 == toIndex % 8 || fromCol == toCol) {
+                // Vertical or horizontal move
+                if (fromRow < toRow) {
+                    for (int i = fromRow + 1; i < toRow; i++) {
+                        if (board[getIndex(i, fromCol)] != null) {
+                            System.out.println("Path is blocked by another piece.");
+                            return;
+                        }
+                    }
+                } else {
+                    for (int i = toRow + 1; i < fromRow; i++) {
+                        if (board[getIndex(i, fromCol)] != null) {
+                            System.out.println("Path is blocked by another piece.");
+                            return;
+                        }
+                    }
+                }
+                executeMove(fromRow, fromCol, toRow, toCol);
+            } 
+            else {
+                System.out.println("Invalid queen move.");
+            }
         }
         else if (pieceType == 'K') {
-            
+            if (Math.abs(fromRow - toRow) <= 1 && Math.abs(fromCol - toCol) <= 1) {
+                // Valid king move
+                if (moveCount % 2 == 0 && whiteInCheck) {
+                    System.out.println("White is in check, cannot move king.");
+                    return;
+                } else if (moveCount % 2 == 1 && blackInCheck) {
+                    System.out.println("Black is in check, cannot move king.");
+                    return;
+                }
+                executeMove(fromRow, fromCol, toRow, toCol);
+            } else {
+                System.out.println("Invalid king move.");
+            }
         }
         
 
