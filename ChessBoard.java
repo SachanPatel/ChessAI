@@ -261,6 +261,7 @@ public class ChessBoard {
             
         } 
         else if (pieceType == 'R') {
+            
             if (fromIndex % 8 == toIndex % 8) {
                 // Vertical move
                 if (fromRow < toRow) {
@@ -279,6 +280,15 @@ public class ChessBoard {
                     }
                 }
                 executeMove(fromRow, fromCol, toRow, toCol);
+                if (fromRow == 0 && fromCol == 0) {
+                    rookMovedW1 = true; // White's rook on a1 has moved
+                } else if (fromRow == 0 && fromCol == 7) {
+                    rookMovedW2 = true; // White's rook on h1 has moved
+                } else if (fromRow == 7 && fromCol == 0) {
+                    rookMovedB1 = true;
+                } else if (fromRow == 7 && fromCol == 7) {
+                    rookMovedB2 = true;
+                }
             } else if (fromCol == toCol) {
                 // Horizontal move
                 if (fromCol < toCol) {

@@ -15,6 +15,4 @@ public class ChessPiece {
         return color;
     }
     
-
-
 }
