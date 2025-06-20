@@ -30,7 +30,7 @@ public class ChessGame {
         "pawn_black.png",   "knight_black.png", "bishop_black.png",
         "rook_black.png",   "queen_black.png",  "king_black.png"
     };
-
+    
     public ChessGame() {
         initializeBitboards();
     }
@@ -194,71 +194,103 @@ public class ChessGame {
     }
 
     /** Generate all legal pseudo-moves plus castling */
-    public List<String> generateMoves() {
-        List<String> moves = new ArrayList<>();
-        long bb = whiteToMove ? allWhite() : allBlack();
-        while (bb != 0) {
-            long m = bb & -bb;
-            int from = Long.numberOfTrailingZeros(m);
-            bb &= bb - 1;
-            for (int to : generateMovesFrom(from)) {
-                moves.add("" + indexToFile(from) + indexToRank(from)
-                          + '-' + indexToFile(to) + indexToRank(to));
-            }
+   public List<String> generateMoves() {
+    // 1) Build up all pseudo-legal moves
+    List<String> pseudo = new ArrayList<>();
+    long bb = whiteToMove ? allWhite() : allBlack();
+    while (bb != 0) {
+        long m = bb & -bb;
+        int from = Long.numberOfTrailingZeros(m);
+        bb &= bb - 1;
+        for (int to : generateMovesFrom(from)) {
+            pseudo.add("" 
+                + indexToFile(from) 
+                + indexToRank(from)
+                + '-' 
+                + indexToFile(to) 
+                + indexToRank(to));
         }
-
-        // Castling
-        if (whiteToMove) {
-            // White king-side
-            if (whiteCastleKingSide
-                && clearBetween("E1","G1")
-                && !isOccupied(occupied(), algebraicToIndex("F1"))
-                && !isOccupied(occupied(), algebraicToIndex("G1"))
-                && !isSquareAttacked(algebraicToIndex("E1"), false)
-                && !isSquareAttacked(algebraicToIndex("F1"), false)
-                && !isSquareAttacked(algebraicToIndex("G1"), false))
-            {
-                moves.add("O-O");
-            }
-            // White queen-side
-            if (whiteCastleQueenSide
-                && clearBetween("E1","C1")
-                && !isOccupied(occupied(), algebraicToIndex("D1"))
-                && !isOccupied(occupied(), algebraicToIndex("C1"))
-                && !isSquareAttacked(algebraicToIndex("E1"), false)
-                && !isSquareAttacked(algebraicToIndex("D1"), false)
-                && !isSquareAttacked(algebraicToIndex("C1"), false))
-            {
-                moves.add("O-O-O");
-            }
-
-        } else {
-            // Black king-side
-            if (blackCastleKingSide
-                && clearBetween("E8","G8")
-                && !isOccupied(occupied(), algebraicToIndex("F8"))
-                && !isOccupied(occupied(), algebraicToIndex("G8"))
-                && !isSquareAttacked(algebraicToIndex("E8"), true)
-                && !isSquareAttacked(algebraicToIndex("F8"), true)
-                && !isSquareAttacked(algebraicToIndex("G8"), true))
-            {
-                moves.add("O-O");
-            }
-            // Black queen-side
-            if (blackCastleQueenSide
-                && clearBetween("E8","C8")
-                && !isOccupied(occupied(), algebraicToIndex("D8"))
-                && !isOccupied(occupied(), algebraicToIndex("C8"))
-                && !isSquareAttacked(algebraicToIndex("E8"), true)
-                && !isSquareAttacked(algebraicToIndex("D8"), true)
-                && !isSquareAttacked(algebraicToIndex("C8"), true))
-            {
-                moves.add("O-O-O");
-            }
-        }
-
-        return moves;
     }
+
+    // 2) Add castling in exactly the same way you had before
+    if (whiteToMove) {
+        if (whiteCastleKingSide
+            && clearBetween("E1","G1")
+            && !isOccupied(occupied(), algebraicToIndex("F1"))
+            && !isOccupied(occupied(), algebraicToIndex("G1"))
+            && !isSquareAttacked(algebraicToIndex("E1"), false)
+            && !isSquareAttacked(algebraicToIndex("F1"), false)
+            && !isSquareAttacked(algebraicToIndex("G1"), false))
+        {
+            pseudo.add("O-O");
+        }
+        if (whiteCastleQueenSide
+            && clearBetween("E1","C1")
+            && !isOccupied(occupied(), algebraicToIndex("D1"))
+            && !isOccupied(occupied(), algebraicToIndex("C1"))
+            && !isSquareAttacked(algebraicToIndex("E1"), false)
+            && !isSquareAttacked(algebraicToIndex("D1"), false)
+            && !isSquareAttacked(algebraicToIndex("C1"), false))
+        {
+            pseudo.add("O-O-O");
+        }
+    } else {
+        if (blackCastleKingSide
+            && clearBetween("E8","G8")
+            && !isOccupied(occupied(), algebraicToIndex("F8"))
+            && !isOccupied(occupied(), algebraicToIndex("G8"))
+            && !isSquareAttacked(algebraicToIndex("E8"), true)
+            && !isSquareAttacked(algebraicToIndex("F8"), true)
+            && !isSquareAttacked(algebraicToIndex("G8"), true))
+        {
+            pseudo.add("O-O");
+        }
+        if (blackCastleQueenSide
+            && clearBetween("E8","C8")
+            && !isOccupied(occupied(), algebraicToIndex("D8"))
+            && !isOccupied(occupied(), algebraicToIndex("C8"))
+            && !isSquareAttacked(algebraicToIndex("E8"), true)
+            && !isSquareAttacked(algebraicToIndex("D8"), true)
+            && !isSquareAttacked(algebraicToIndex("C8"), true))
+        {
+            pseudo.add("O-O-O");
+        }
+    }
+
+    // 3) Now filter out any move that would leave your king in check
+    List<String> legal = new ArrayList<>();
+    boolean me = whiteToMove;
+    for (String mv : pseudo) {
+        ChessGame copy = this.copy();
+        copy.applyAlgebraicMove(mv);
+        if (!copy.isInCheck(me)) {
+            legal.add(mv);
+        }
+    }
+
+    return legal;
+}
+
+
+/** Returns true if the given side’s king is under attack. */
+public boolean isInCheck(boolean white) {
+    int kingSq = white
+        ? Long.numberOfTrailingZeros(whiteKing)
+        : Long.numberOfTrailingZeros(blackKing);
+    return isSquareAttacked(kingSq, !white);
+}
+
+/** Returns true if side to move is in checkmate. */
+public boolean isCheckmate(boolean white) {
+    // check that king is in check, and has no legal move out
+    if (!isInCheck(white)) return false;
+    // temporarily flip side so generateMoves() filters correctly
+    boolean save = whiteToMove;
+    whiteToMove = white;
+    List<String> moves = generateMoves();
+    whiteToMove = save;
+    return moves.isEmpty();
+}
 
     /** Generate moves for a single square (no castling) */
     private List<Integer> generateMovesFrom(int from) {
@@ -440,27 +472,10 @@ public class ChessGame {
         return score;
     }
 
-    public boolean isInCheck(boolean white) {
-        int kingSq = white
-            ? Long.numberOfTrailingZeros(whiteKing)
-            : Long.numberOfTrailingZeros(blackKing);
-        return isSquareAttacked(kingSq, !white);
-    }
+    
 
-    public boolean isCheckmate(boolean white) {
-        if (!isInCheck(white)) return false;
-        for (String mv : generateMoves()) {
-            if (mv.startsWith("O-O")) continue;
-            ChessGame c = copy();
-            int from = algebraicToIndex(mv.substring(0,2));
-            int to   = algebraicToIndex(mv.substring(mv.length()-2));
-            c.applyMove(from, to);
-            if (!c.isInCheck(white)) return false;
-        }
-        return true;
-    }
 
-    private void drawBoard() {
+     private void drawBoard() {
         StdDraw.setCanvasSize(600,600);
         StdDraw.setXscale(0,8); StdDraw.setYscale(0,8);
         StdDraw.clear();
@@ -496,8 +511,16 @@ public class ChessGame {
                 // draw at center of square, size 1x1
                 StdDraw.picture(c+0.5, r+0.5, imgFile, 1, 1);
             }
+            
+        }
+        for(int i=0;i<64;i++){
+            int r=i/8, c=i%8;
+            StdDraw.setPenColor(Color.DARK_GRAY);
+            StdDraw.text(c+0.1, r+0.1, ""+indexToFile(i)+indexToRank(i));
         }
     }
+
+
     // Helper to apply either O-O/O-O-O or normal moves
     private void applyAlgebraicMove(String mv) {
         if (mv.equals("O-O") || mv.equals("O-O-O")) {
@@ -521,6 +544,10 @@ public class ChessGame {
         while (true) {
             drawBoard();
             List<String> legal = generateMoves();
+            if (legal.isEmpty()) {
+                System.out.println("Game over! " + (isCheckmate(whiteToMove) ? (whiteToMove ? "Black wins!" : "White wins!") : "Stalemate!"));
+                break;
+            }
             if (!whiteToMove) {
                 System.out.println("Black to move. Legal: " + legal);
                 String ai = ChessAI.chooseMove(this);
