@@ -450,27 +450,38 @@ public boolean isCheckmate(boolean white) {
 
     /** Evaluate: material + check + checkmate */
     public int evaluate() {
-        if (isCheckmate(true))  return -10000000;
-        if (isCheckmate(false)) return  10000000;
-        int score=0;
-        for(int i=0;i<64;i++){
-            if (isOccupied(whitePawns,i))   score+=1;
-            if (isOccupied(whiteKnights,i)) score+=3;
-            if (isOccupied(whiteBishops,i)) score+=3;
-            if (isOccupied(whiteRooks,i))   score+=5;
-            if (isOccupied(whiteQueens,i))  score+=9;
-            if (isOccupied(whiteKing,i))    score+=200000;
-            if (isOccupied(blackPawns,i))   score-=1;
-            if (isOccupied(blackKnights,i)) score-=3;
-            if (isOccupied(blackBishops,i)) score-=3;
-            if (isOccupied(blackRooks,i))   score-=5;
-            if (isOccupied(blackQueens,i))  score-=9;
-            if (isOccupied(blackKing,i))    score-=200000;
+        // 1) immediate win/loss
+        if (isCheckmate(true))   return -10_000_000;
+        if (isCheckmate(false))  return  10_000_000;
+
+        // 2) material
+        int score = 0;
+        for (int i = 0; i < 64; i++) {
+            if (isOccupied(whitePawns,   i)) score += 1;
+            if (isOccupied(whiteKnights, i)) score += 3;
+            if (isOccupied(whiteBishops, i)) score += 3;
+            if (isOccupied(whiteRooks,   i)) score += 5;
+            if (isOccupied(whiteQueens,  i)) score += 9;
+            if (isOccupied(whiteKing,    i)) score += 200_000;
+            if (isOccupied(blackPawns,   i)) score -= 1;
+            if (isOccupied(blackKnights, i)) score -= 3;
+            if (isOccupied(blackBishops, i)) score -= 3;
+            if (isOccupied(blackRooks,   i)) score -= 5;
+            if (isOccupied(blackQueens,  i)) score -= 9;
+            if (isOccupied(blackKing,    i)) score -= 200_000;
         }
-        if (isInCheck(false)) score -= 50;
-        if (isInCheck(true))  score += 50;
+
+
+        // 4) center-control bonus  // new
+        int[] center = {27, 28, 35, 36};        // squares d4,e4,d5,e5  // new
+        for (int sq : center) {                 // new
+            if (isOccupied(allWhite(), sq)) score += 1;  // new
+            if (isOccupied(allBlack(), sq)) score -= 1;  // new
+        }                                        // new
+
         return score;
     }
+
 
     
 
@@ -522,7 +533,7 @@ public boolean isCheckmate(boolean white) {
 
 
     // Helper to apply either O-O/O-O-O or normal moves
-    private void applyAlgebraicMove(String mv) {
+    public void applyAlgebraicMove(String mv) {
         if (mv.equals("O-O") || mv.equals("O-O-O")) {
             boolean ks = mv.equals("O-O");
             int from = algebraicToIndex(whiteToMove ? "E1" : "E8");
