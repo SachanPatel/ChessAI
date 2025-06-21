@@ -1,7 +1,10 @@
 // ChessGame.cpp
 
 #include "ChessGame.h"
+#include "ChessAI.h"            // new: bring in the AI
 #include <iostream>
+#include <string>
+#include <vector>
 #include <regex>
 #include <algorithm>
 #include <cmath>
@@ -418,52 +421,72 @@ int ChessGame::evaluate() const {
 }
 
 // ASCII UI
+
 void ChessGame::startGame() {
-    std::regex rx(R"(^([A-H][1-8]-[A-H][1-8])$|^(O-O|O-O-O)$)");
-    std::string in;
-    while(true){
-        // board
-        for(int r=7;r>=0;--r){
-            std::cout<<r+1<<' ';
-            for(int f=0;f<8;++f){
-                int idx=r*8+f; char c='.';
-                if(isOccupied(whitePawns,idx))   c='P';
-                else if(isOccupied(whiteKnights,idx)) c='N';
-                else if(isOccupied(whiteBishops,idx)) c='B';
-                else if(isOccupied(whiteRooks,idx))   c='R';
-                else if(isOccupied(whiteQueens,idx))  c='Q';
-                else if(isOccupied(whiteKing,idx))    c='K';
-                else if(isOccupied(blackPawns,idx))   c='p';
-                else if(isOccupied(blackKnights,idx)) c='n';
-                else if(isOccupied(blackBishops,idx)) c='b';
-                else if(isOccupied(blackRooks,idx))   c='r';
-                else if(isOccupied(blackQueens,idx))  c='q';
-                else if(isOccupied(blackKing,idx))    c='k';
-                std::cout<<c<<' ';
+    std::regex mvRx(R"(^([A-H][1-8]-[A-H][1-8])$|^(O-O|O-O-O)$)");
+    std::string input;
+
+    while (true) {
+        // --- 1) draw ASCII board ---
+        for (int r = 7; r >= 0; --r) {
+            std::cout << r+1 << ' ';
+            for (int f = 0; f < 8; ++f) {
+                int idx = r*8 + f;
+                char c = '.';
+                if      (isOccupied(whitePawns,   idx)) c='P';
+                else if (isOccupied(whiteKnights, idx)) c='N';
+                else if (isOccupied(whiteBishops, idx)) c='B';
+                else if (isOccupied(whiteRooks,   idx)) c='R';
+                else if (isOccupied(whiteQueens,  idx)) c='Q';
+                else if (isOccupied(whiteKing,    idx)) c='K';
+                else if (isOccupied(blackPawns,   idx)) c='p';
+                else if (isOccupied(blackKnights, idx)) c='n';
+                else if (isOccupied(blackBishops, idx)) c='b';
+                else if (isOccupied(blackRooks,   idx)) c='r';
+                else if (isOccupied(blackQueens,  idx)) c='q';
+                else if (isOccupied(blackKing,    idx)) c='k';
+                std::cout << c << ' ';
             }
-            std::cout<<"\n";
+            std::cout << "\n";
         }
-        std::cout<<"  A B C D E F G H\n";
+        std::cout << "  A B C D E F G H\n\n";
 
+        // --- 2) generate legal moves ---
         auto legal = generateMoves();
-        if(legal.empty()){
-            if(isCheckmate(whiteToMove))
-                std::cout<<(whiteToMove?"Black":"White")<<" wins!\n";
+        if (legal.empty()) {
+            if (isCheckmate(whiteToMove))
+                std::cout << (whiteToMove ? "Black" : "White") << " wins!\n";
             else
-                std::cout<<"Stalemate!\n";
-            break;
+                std::cout << "Stalemate!\n";
+            return;
         }
 
-        std::cout<<(whiteToMove?"White":"Black")<<" to move. Legal:";
-        for(auto&s:legal) std::cout<<' '<<s;
-        std::cout<<"\nEnter move or EXIT: ";
-        std::getline(std::cin,in);
-        if(in=="EXIT") break;
-        if(!std::regex_match(in,rx)||
-           std::find(legal.begin(),legal.end(),in)==legal.end()){
-            std::cout<<"Illegal, try again.\n";
+        // DEBUG: see whose turn it is
+        // std::cout << "[DEBUG] whiteToMove=" << whiteToMove << "\n";
+
+        // --- 3) AI plays on Black’s turn ---
+        if (!whiteToMove) {
+            std::string aiMv = ChessAI::chooseMove(*this);
+            std::cout << "Black (AI) plays: " << aiMv << "\n\n";
+            applyAlgebraicMove(aiMv);
+            continue;   // go back to top, redraw board
+        }
+
+        // --- 4) Human plays on White’s turn ---
+        std::cout << "White to move.  Legal:";
+        for (auto &m : legal) std::cout << ' ' << m;
+        std::cout << "\nEnter move or EXIT: ";
+        std::getline(std::cin, input);
+
+        if (input == "EXIT") return;
+        if (!std::regex_match(input, mvRx) ||
+            std::find(legal.begin(), legal.end(), input) == legal.end())
+        {
+            std::cout << "Illegal move, try again.\n\n";
             continue;
         }
-        applyAlgebraicMove(in);
+
+        applyAlgebraicMove(input);
+        std::cout << "\n";
     }
 }
