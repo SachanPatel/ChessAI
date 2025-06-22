@@ -56,6 +56,17 @@ public class ChessGame {
         enPassantTarget = -1;
     }
 
+     // --- undo stack support ----------------------------------------
+    private static class Move {                                    // new
+        int from, to;
+        int movedPiece, capturedPiece, capturedFrom;
+        boolean wasPromotion, wasEnPassant, wasCastling;
+        int rookFrom, rookTo;
+        boolean oldWCks, oldWCqs, oldBCks, oldBCqs;
+        int oldEp;
+    }
+    private Deque<Move> moveStack = new ArrayDeque<>();           // new
+
     public int algebraicToIndex(String sq) {
         sq = sq.toUpperCase();
         int file = sq.charAt(0) - 'A';
@@ -100,97 +111,185 @@ public class ChessGame {
     }
 
     public void applyMove(int from, int to) {
-        int oldEp = enPassantTarget;
-        enPassantTarget = -1;
+        Move m = new Move();                                    // new
+        // save pre‐move state
+        m.from = from; m.to = to;
+        m.oldWCks = whiteCastleKingSide;
+        m.oldWCqs = whiteCastleQueenSide;
+        m.oldBCks = blackCastleKingSide;
+        m.oldBCqs = blackCastleQueenSide;
+        m.oldEp   = enPassantTarget;
 
-        long maskFrom = 1L << from;
-        long maskTo   = 1L << to;
-
+        long maskFrom = 1L << from, maskTo = 1L << to;
         long[] bbs = {
             whitePawns, whiteKnights, whiteBishops, whiteRooks, whiteQueens, whiteKing,
             blackPawns, blackKnights, blackBishops, blackRooks, blackQueens, blackKing
         };
 
-        // 1) Clear destination (capture or en passant)
-        for (int i = 0; i < bbs.length; i++) {
-            bbs[i] &= ~maskTo;
-        }
-
-        // 2) Move piece
-        int moved = -1;
-        for (int i = 0; i < bbs.length; i++) {
-            if ((bbs[i] & maskFrom) != 0) {
-                moved = i;
-                bbs[i] = (bbs[i] & ~maskFrom) | maskTo;
+        // find which piece is moving
+        int movedIndex = -1;
+        for (int i = 0; i < 12; i++) {
+            if ((bbs[i] & maskFrom) != 0L) {
+                movedIndex = i;
                 break;
             }
         }
+        m.movedPiece = movedIndex;
 
-        boolean wm = (moved < 6);
-
-        // 3) Double pawn push → set en passant target
-        if (moved == (wm ? 0 : 6) && Math.abs(to - from) == 16) {
-            enPassantTarget = (from + to) / 2;
+        boolean wm = movedIndex < 6;
+        // detect en passant capture
+        int oldEp = enPassantTarget;
+        m.wasEnPassant = false;
+        m.capturedPiece = -1;
+        if (movedIndex == (wm ? 0 : 6) && to == oldEp) {
+            m.wasEnPassant = true;
+            m.capturedPiece = wm ? 6 : 0;
+            m.capturedFrom = wm ? to - 8 : to + 8;
+        } else {
+            // normal capture?
+            for (int i = 0; i < 12; i++) if (i != movedIndex) {
+                if (((bbs[i] & maskTo) != 0L)) {
+                    m.capturedPiece = i;
+                    m.capturedFrom  = to;
+                }
+            }
         }
 
-        // 4) En passant capture
-        if (to == oldEp && moved == (wm ? 0 : 6)) {
-            int cap = wm ? to - 8 : to + 8;
-            bbs[ wm ? 6 : 0 ] &= ~(1L << cap);
+        // clear destination (captures)
+        for (int i = 0; i < 12; i++) {
+            bbs[i] &= ~maskTo;
+        }
+        // if en passant, remove that pawn
+        if (m.wasEnPassant) {
+            long capMask = 1L << m.capturedFrom;
+            bbs[m.capturedPiece] &= ~capMask;
         }
 
-        // 5) Pawn promotion to queen
-        if (moved == (wm ? 0 : 6)) {
+        // now move the piece
+        bbs[movedIndex] &= ~maskFrom;
+        bbs[movedIndex] |=  maskTo;
+
+        // promotion?
+        m.wasPromotion = false;
+        if (movedIndex == (wm ? 0 : 6)) {
             int rank = to / 8;
             if ((wm && rank == 7) || (!wm && rank == 0)) {
-                bbs[moved] &= ~maskTo;            // remove pawn
-                int qIdx = wm ? 4 : 10;           // queen index
-                bbs[qIdx] |= maskTo;
+                m.wasPromotion = true;
+                // remove the pawn
+                bbs[movedIndex] &= ~maskTo;
+                // add a queen
+                int qIndex = wm ? 4 : 10;
+                bbs[qIndex] |= maskTo;
             }
         }
 
-        // 6) Invalidate castling rights if rook or king moved/captured
-        if (moved == 5)  whiteCastleKingSide = whiteCastleQueenSide = false;
-        if (moved == 11) blackCastleKingSide = blackCastleQueenSide = false;
-        if (from == algebraicToIndex("H1") || to == algebraicToIndex("H1")) whiteCastleKingSide = false;
-        if (from == algebraicToIndex("A1") || to == algebraicToIndex("A1")) whiteCastleQueenSide = false;
-        if (from == algebraicToIndex("H8") || to == algebraicToIndex("H8")) blackCastleKingSide = false;
-        if (from == algebraicToIndex("A8") || to == algebraicToIndex("A8")) blackCastleQueenSide = false;
-
-        // 7) Rook relocation for castling only when appropriate
-        // White
-        if (moved == 5 && from == algebraicToIndex("E1")) {
-            if (to == algebraicToIndex("G1")) {
-                // White king-side
-                bbs[3] &= ~(1L << algebraicToIndex("H1"));
-                bbs[3] |=  (1L << algebraicToIndex("F1"));
-            } else if (to == algebraicToIndex("C1")) {
-                // White queen-side
-                bbs[3] &= ~(1L << algebraicToIndex("A1"));
-                bbs[3] |=  (1L << algebraicToIndex("D1"));
-            }
-        }
-        // Black
-        if (moved == 11 && from == algebraicToIndex("E8")) {
-            if (to == algebraicToIndex("G8")) {
-                // Black king-side
-                bbs[9] &= ~(1L << algebraicToIndex("H8"));
-                bbs[9] |=  (1L << algebraicToIndex("F8"));
-            } else if (to == algebraicToIndex("C8")) {
-                // Black queen-side
-                bbs[9] &= ~(1L << algebraicToIndex("A8"));
-                bbs[9] |=  (1L << algebraicToIndex("D8"));
+        // castling?
+        m.wasCastling = false;
+        if (movedIndex == (wm ? 5 : 11) && Math.abs(to - from) == 2) {
+            m.wasCastling = true;
+            if (wm) {
+                // white
+                if (to == algebraicToIndex("G1")) {
+                    m.rookFrom = algebraicToIndex("H1");
+                    m.rookTo   = algebraicToIndex("F1");
+                } else {
+                    m.rookFrom = algebraicToIndex("A1");
+                    m.rookTo   = algebraicToIndex("D1");
+                }
+                // do the rook move
+                bbs[3] &= ~(1L << m.rookFrom);
+                bbs[3] |=  (1L << m.rookTo);
+            } else {
+                // black
+                if (to == algebraicToIndex("G8")) {
+                    m.rookFrom = algebraicToIndex("H8");
+                    m.rookTo   = algebraicToIndex("F8");
+                } else {
+                    m.rookFrom = algebraicToIndex("A8");
+                    m.rookTo   = algebraicToIndex("D8");
+                }
+                bbs[9] &= ~(1L << m.rookFrom);
+                bbs[9] |=  (1L << m.rookTo);
             }
         }
 
-        // 8) Write back bitboards
+        // update castling rights
+        if (movedIndex == 5)  whiteCastleKingSide = whiteCastleQueenSide = false;
+        if (movedIndex == 11) blackCastleKingSide = blackCastleQueenSide = false;
+        int h1 = algebraicToIndex("H1"), a1 = algebraicToIndex("A1"),
+            h8 = algebraicToIndex("H8"), a8 = algebraicToIndex("A8");
+        if (from==h1||to==h1) whiteCastleKingSide = false;
+        if (from==a1||to==a1) whiteCastleQueenSide= false;
+        if (from==h8||to==h8) blackCastleKingSide = false;
+        if (from==a8||to==a8) blackCastleQueenSide= false;
+
+        // write back bitboards
         whitePawns   = bbs[0];  whiteKnights = bbs[1];  whiteBishops = bbs[2];
         whiteRooks   = bbs[3];  whiteQueens  = bbs[4];  whiteKing    = bbs[5];
         blackPawns   = bbs[6];  blackKnights = bbs[7];  blackBishops = bbs[8];
         blackRooks   = bbs[9];  blackQueens  = bbs[10]; blackKing    = bbs[11];
 
-        // 9) Flip turn
+        // flip side
         whiteToMove = !whiteToMove;
+
+        // push onto undo stack
+        moveStack.push(m);                                       // new
+    }
+
+     /** Undo the last move. */ 
+    public void undoMove() {                                      // new
+        Move m = moveStack.pop();
+        // restore castling flags & ep
+        whiteCastleKingSide = m.oldWCks;
+        whiteCastleQueenSide= m.oldWCqs;
+        blackCastleKingSide = m.oldBCks;
+        blackCastleQueenSide= m.oldBCqs;
+        enPassantTarget     = m.oldEp;
+
+        // flip side back
+        whiteToMove = !whiteToMove;
+
+        long maskFrom = 1L<<m.from, maskTo = 1L<<m.to;
+        long[] bbs = {
+            whitePawns, whiteKnights, whiteBishops, whiteRooks, whiteQueens, whiteKing,
+            blackPawns, blackKnights, blackBishops, blackRooks, blackQueens, blackKing
+        };
+
+        // undo promotion?
+        if (m.wasPromotion) {
+            // queen->pawn
+            int qIdx = (m.movedPiece<6?4:10);
+            bbs[qIdx] &= ~maskTo;
+            bbs[m.movedPiece] |= maskFrom;
+        } else {
+            // move piece back
+            bbs[m.movedPiece] &= ~maskTo;
+            bbs[m.movedPiece] |= maskFrom;
+        }
+
+        // undo en passant pawn
+        if (m.wasEnPassant) {
+            long capMask = 1L<<m.capturedFrom;
+            bbs[m.capturedPiece] |= capMask;
+        }
+
+        // undo normal capture
+        if (m.capturedPiece >= 0 && !m.wasEnPassant) {
+            bbs[m.capturedPiece] |= (1L<<m.capturedFrom);
+        }
+
+        // undo castling rook
+        if (m.wasCastling) {
+            int rookIdx = (m.movedPiece<6?3:9);
+            bbs[rookIdx] &= ~(1L<<m.rookTo);
+            bbs[rookIdx] |=  (1L<<m.rookFrom);
+        }
+
+        // write back
+        whitePawns   = bbs[0];  whiteKnights = bbs[1];  whiteBishops = bbs[2];
+        whiteRooks   = bbs[3];  whiteQueens  = bbs[4];  whiteKing    = bbs[5];
+        blackPawns   = bbs[6];  blackKnights = bbs[7];  blackBishops = bbs[8];
+        blackRooks   = bbs[9];  blackQueens  = bbs[10]; blackKing    = bbs[11];
     }
 
     /** Generate all legal pseudo-moves plus castling */
