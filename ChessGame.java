@@ -556,17 +556,17 @@ public boolean isCheckmate(boolean white) {
         // 2) material
         int score = 0;
         for (int i = 0; i < 64; i++) {
-            if (isOccupied(whitePawns,   i)) score += 1;
-            if (isOccupied(whiteKnights, i)) score += 3;
-            if (isOccupied(whiteBishops, i)) score += 3;
-            if (isOccupied(whiteRooks,   i)) score += 5;
-            if (isOccupied(whiteQueens,  i)) score += 9;
+            if (isOccupied(whitePawns,   i)) score += 10;
+            if (isOccupied(whiteKnights, i)) score += 30;
+            if (isOccupied(whiteBishops, i)) score += 30;
+            if (isOccupied(whiteRooks,   i)) score += 50;
+            if (isOccupied(whiteQueens,  i)) score += 90;
             if (isOccupied(whiteKing,    i)) score += 200_000;
-            if (isOccupied(blackPawns,   i)) score -= 1;
-            if (isOccupied(blackKnights, i)) score -= 3;
-            if (isOccupied(blackBishops, i)) score -= 3;
-            if (isOccupied(blackRooks,   i)) score -= 5;
-            if (isOccupied(blackQueens,  i)) score -= 9;
+            if (isOccupied(blackPawns,   i)) score -= 11;
+            if (isOccupied(blackKnights, i)) score -= 33;
+            if (isOccupied(blackBishops, i)) score -= 33;
+            if (isOccupied(blackRooks,   i)) score -= 55;
+            if (isOccupied(blackQueens,  i)) score -= 99;
             if (isOccupied(blackKing,    i)) score -= 200_000;
         }
 
@@ -574,10 +574,16 @@ public boolean isCheckmate(boolean white) {
         // 4) center-control bonus  // new
         int[] center = {27, 28, 35, 36};        // squares d4,e4,d5,e5  // new
         for (int sq : center) {                 // new
-            if (isOccupied(allWhite(), sq)) score += 1;  // new
-            if (isOccupied(allBlack(), sq)) score -= 1;  // new
+            if (isOccupied(allWhite(), sq)) score += 10;  // new
+            if (isOccupied(allBlack(), sq)) score -= 10;  // new
         }                                        // new
 
+        // 5) outer center-control bonus // new
+        int[] outer_center = {18,19,20,21,26,29,34,37,42,43,44,45};
+        for (int sq: outer_center) {
+            if (isOccupied(allWhite(), sq)) score += 5;
+            if (isOccupied(allBlack(), sq)) score -= 10;
+        }
         return score;
     }
 
@@ -660,10 +666,20 @@ public boolean isCheckmate(boolean white) {
             }
             if (!whiteToMove) {
                 System.out.println("Black to move. Legal: " + legal);
-                String ai = ChessAI.chooseMove(this);
+                String ai = ChessAIB.chooseMove(this);
                 System.out.println("AI plays: " + ai);
                 applyAlgebraicMove(ai);
             } else {
+                //new
+                /* 
+                System.out.println("White to move. Legal: " + legal);
+                String ai = ChessAIW.chooseMove(this);
+                System.out.println("AI plays: " + ai);
+                applyAlgebraicMove(ai);
+                */
+                //new end
+                
+                
                 System.out.println("White to move. Legal: " + legal);
                 System.out.print("Enter move or EXIT: ");
                 String in = sc.nextLine().trim().toUpperCase();
