@@ -110,23 +110,36 @@ public class ChessGame {
         return g;
     }
 
+    /**
+ * Applies a move from `from` to `to`, handling captures, promotions,
+ * castling, en passant, and updating castling rights.  Also records
+ * all necessary information to undo the move later.
+ */
     public void applyMove(int from, int to) {
-        Move m = new Move();                                    // new
-        // save pre‐move state
-        m.from = from; m.to = to;
-        m.oldWCks = whiteCastleKingSide;
-        m.oldWCqs = whiteCastleQueenSide;
-        m.oldBCks = blackCastleKingSide;
-        m.oldBCqs = blackCastleQueenSide;
-        m.oldEp   = enPassantTarget;
+        Move m = new Move();
 
-        long maskFrom = 1L << from, maskTo = 1L << to;
+        // 1) Save pre-move state for undo:
+        m.from            = from;
+        m.to              = to;
+        m.oldWCks         = whiteCastleKingSide;
+        m.oldWCqs         = whiteCastleQueenSide;
+        m.oldBCks         = blackCastleKingSide;
+        m.oldBCqs         = blackCastleQueenSide;
+        m.oldEp           = enPassantTarget;
+
+        // Clear the en passant target by default—will be reset on a double-pawn push
+        enPassantTarget = -1;
+
+        long maskFrom = 1L << from;
+        long maskTo   = 1L << to;
+
+        // Gather all 12 piece bitboards into an array for convenience
         long[] bbs = {
-            whitePawns, whiteKnights, whiteBishops, whiteRooks, whiteQueens, whiteKing,
-            blackPawns, blackKnights, blackBishops, blackRooks, blackQueens, blackKing
+            whitePawns,   whiteKnights, whiteBishops, whiteRooks, whiteQueens, whiteKing,
+            blackPawns,   blackKnights, blackBishops, blackRooks, blackQueens, blackKing
         };
 
-        // find which piece is moving
+        // 2) Figure out which piece is moving
         int movedIndex = -1;
         for (int i = 0; i < 12; i++) {
             if ((bbs[i] & maskFrom) != 0L) {
@@ -135,60 +148,61 @@ public class ChessGame {
             }
         }
         m.movedPiece = movedIndex;
+        boolean wm = (movedIndex < 6);
 
-        boolean wm = movedIndex < 6;
-        // detect en passant capture
-        int oldEp = enPassantTarget;
-        m.wasEnPassant = false;
-        m.capturedPiece = -1;
+        // 3) Detect en passant capture (using the oldEp we saved)
+        int oldEp = m.oldEp;
+        m.wasEnPassant   = false;
+        m.capturedPiece  = -1;
         if (movedIndex == (wm ? 0 : 6) && to == oldEp) {
-            m.wasEnPassant = true;
-            m.capturedPiece = wm ? 6 : 0;
-            m.capturedFrom = wm ? to - 8 : to + 8;
+            // This was an en passant capture
+            m.wasEnPassant  = true;
+            m.capturedPiece = wm ? 6 : 0;              // opposing pawn array index
+            m.capturedFrom  = wm ? (to - 8) : (to + 8);
         } else {
-            // normal capture?
-            for (int i = 0; i < 12; i++) if (i != movedIndex) {
-                if (((bbs[i] & maskTo) != 0L)) {
+            // Normal capture: did any other bitboard occupy the 'to' square?
+            for (int i = 0; i < 12; i++) {
+                if (i != movedIndex && (bbs[i] & maskTo) != 0L) {
                     m.capturedPiece = i;
                     m.capturedFrom  = to;
+                    break;
                 }
             }
         }
 
-        // clear destination (captures)
+        // 4) Clear the destination square (capture or en passant)
         for (int i = 0; i < 12; i++) {
             bbs[i] &= ~maskTo;
         }
-        // if en passant, remove that pawn
         if (m.wasEnPassant) {
+            // Remove the captured pawn from its square
             long capMask = 1L << m.capturedFrom;
             bbs[m.capturedPiece] &= ~capMask;
         }
 
-        // now move the piece
+        // 5) Actually move the piece from 'from' to 'to'
         bbs[movedIndex] &= ~maskFrom;
         bbs[movedIndex] |=  maskTo;
 
-        // promotion?
+        // 6) Handle pawn promotion
         m.wasPromotion = false;
         if (movedIndex == (wm ? 0 : 6)) {
             int rank = to / 8;
             if ((wm && rank == 7) || (!wm && rank == 0)) {
                 m.wasPromotion = true;
-                // remove the pawn
+                // Remove pawn and add a queen
                 bbs[movedIndex] &= ~maskTo;
-                // add a queen
-                int qIndex = wm ? 4 : 10;
-                bbs[qIndex] |= maskTo;
+                int qIdx = wm ? 4 : 10;
+                bbs[qIdx] |= maskTo;
             }
         }
 
-        // castling?
+        // 7) Handle castling (king move of two squares)
         m.wasCastling = false;
-        if (movedIndex == (wm ? 5 : 11) && Math.abs(to - from) == 2) {
+        if ((movedIndex == (wm ? 5 : 11)) && Math.abs(to - from) == 2) {
             m.wasCastling = true;
             if (wm) {
-                // white
+                // White castling
                 if (to == algebraicToIndex("G1")) {
                     m.rookFrom = algebraicToIndex("H1");
                     m.rookTo   = algebraicToIndex("F1");
@@ -196,11 +210,10 @@ public class ChessGame {
                     m.rookFrom = algebraicToIndex("A1");
                     m.rookTo   = algebraicToIndex("D1");
                 }
-                // do the rook move
                 bbs[3] &= ~(1L << m.rookFrom);
                 bbs[3] |=  (1L << m.rookTo);
             } else {
-                // black
+                // Black castling
                 if (to == algebraicToIndex("G8")) {
                     m.rookFrom = algebraicToIndex("H8");
                     m.rookTo   = algebraicToIndex("F8");
@@ -213,27 +226,32 @@ public class ChessGame {
             }
         }
 
-        // update castling rights
+        // 8) Invalidate castling rights if king or rook moved/captured
         if (movedIndex == 5)  whiteCastleKingSide = whiteCastleQueenSide = false;
         if (movedIndex == 11) blackCastleKingSide = blackCastleQueenSide = false;
-        int h1 = algebraicToIndex("H1"), a1 = algebraicToIndex("A1"),
-            h8 = algebraicToIndex("H8"), a8 = algebraicToIndex("A8");
-        if (from==h1||to==h1) whiteCastleKingSide = false;
-        if (from==a1||to==a1) whiteCastleQueenSide= false;
-        if (from==h8||to==h8) blackCastleKingSide = false;
-        if (from==a8||to==a8) blackCastleQueenSide= false;
+        int H1 = algebraicToIndex("H1"), A1 = algebraicToIndex("A1");
+        int H8 = algebraicToIndex("H8"), A8 = algebraicToIndex("A8");
+        if (from==H1||to==H1) whiteCastleKingSide  = false;
+        if (from==A1||to==A1) whiteCastleQueenSide = false;
+        if (from==H8||to==H8) blackCastleKingSide  = false;
+        if (from==A8||to==A8) blackCastleQueenSide = false;
 
-        // write back bitboards
+        // 9) ** New: set en passant target if this was a two-square pawn push **
+        if (movedIndex == (wm ? 0 : 6) && Math.abs(to - from) == 16) {
+            enPassantTarget = (from + to) / 2;
+        }
+
+        // 10) Write back all bitboards
         whitePawns   = bbs[0];  whiteKnights = bbs[1];  whiteBishops = bbs[2];
         whiteRooks   = bbs[3];  whiteQueens  = bbs[4];  whiteKing    = bbs[5];
         blackPawns   = bbs[6];  blackKnights = bbs[7];  blackBishops = bbs[8];
         blackRooks   = bbs[9];  blackQueens  = bbs[10]; blackKing    = bbs[11];
 
-        // flip side
+        // 11) Flip side to move
         whiteToMove = !whiteToMove;
 
-        // push onto undo stack
-        moveStack.push(m);                                       // new
+        // 12) Push onto undo stack
+        moveStack.push(m);
     }
 
      /** Undo the last move. */ 
@@ -562,29 +580,47 @@ public boolean isCheckmate(boolean white) {
             if (isOccupied(whiteRooks,   i)) score += 50;
             if (isOccupied(whiteQueens,  i)) score += 90;
             if (isOccupied(whiteKing,    i)) score += 200_000;
-            if (isOccupied(blackPawns,   i)) score -= 11;
-            if (isOccupied(blackKnights, i)) score -= 33;
-            if (isOccupied(blackBishops, i)) score -= 33;
-            if (isOccupied(blackRooks,   i)) score -= 55;
-            if (isOccupied(blackQueens,  i)) score -= 99;
+            if (isOccupied(blackPawns,   i)) score -= 10;
+            if (isOccupied(blackKnights, i)) score -= 30;
+            if (isOccupied(blackBishops, i)) score -= 30;
+            if (isOccupied(blackRooks,   i)) score -= 50;
+            if (isOccupied(blackQueens,  i)) score -= 90;
             if (isOccupied(blackKing,    i)) score -= 200_000;
         }
 
-
+        while (true)  {
+            
+            break;
+        }
+        
         // 4) center-control bonus  // new
         int[] center = {27, 28, 35, 36};        // squares d4,e4,d5,e5  // new
         for (int sq : center) {                 // new
-            if (isOccupied(allWhite(), sq)) score += 10;  // new
-            if (isOccupied(allBlack(), sq)) score -= 10;  // new
+            if (isOccupied(allWhite(), sq)) score += 5;  // new
+            if (isOccupied(allBlack(), sq)) score -= 5;  // new
         }                                        // new
 
         // 5) outer center-control bonus // new
         int[] outer_center = {18,19,20,21,26,29,34,37,42,43,44,45};
         for (int sq: outer_center) {
-            if (isOccupied(allWhite(), sq)) score += 5;
-            if (isOccupied(allBlack(), sq)) score -= 10;
+            if (isOccupied(allWhite(), sq)) score += 3;
+            if (isOccupied(allBlack(), sq)) score -= 3;
         }
+
+        long bb = whiteToMove ? allWhite() : allBlack();
+        
+        while (bb != 0) {
+            long m = bb & -bb;
+            int from = Long.numberOfTrailingZeros(m);
+            bb &= bb - 1;
+            if (isSquareAttacked(from,whiteToMove)) {
+                int append = whiteToMove ? 2 : -2;
+                score += append;
+            }
+        }
+        
         return score;
+
     }
 
 
@@ -665,10 +701,23 @@ public boolean isCheckmate(boolean white) {
                 break;
             }
             if (!whiteToMove) {
+                
                 System.out.println("Black to move. Legal: " + legal);
                 String ai = ChessAIB.chooseMove(this);
                 System.out.println("AI plays: " + ai);
                 applyAlgebraicMove(ai);
+                /* 
+                System.out.println("Black to move. Legal: " + legal);
+                System.out.print("Enter move or EXIT: ");
+                String in = sc.nextLine().trim().toUpperCase();
+                if (in.equals("EXIT")) break;
+                Matcher m = p.matcher(in);
+                if (!m.matches() || !legal.contains(in)) {
+                    System.out.println("Illegal, try again.");
+                    continue;
+                }
+                applyAlgebraicMove(in);
+                */
             } else {
                 //new
                 /* 
