@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.AbstractMap.SimpleEntry;
 
 public class ChessAIB {
-    private static final int MAX_DEPTH = 1;
+    private static final int MAX_DEPTH = 5;
 
     /**
      * Choose the best move for Black by searching each root move in parallel.
